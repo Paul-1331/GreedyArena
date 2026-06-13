@@ -79,13 +79,62 @@ router.get('/:sessionId/timer', (req, res) => {
 // POST /api/play/:sessionId/submit
 router.post('/:sessionId/submit', optionalAuth, async (req, res) => {
   const { sessionId } = req.params;
-  const { answers, score, totalQuestions, quizId: fallbackQuizId } = req.body;
+  const { answers: rawAnswers, quizId: fallbackQuizId } = req.body;
   
   try {
     const session = activeSessions.get(sessionId);
     const quizId = session ? session.quizId : fallbackQuizId; 
     
     if (!quizId) return res.status(400).json({ error: 'Missing quiz context' });
+
+    // Fetch actual quiz questions to calculate score securely
+    const quiz = await prisma.quizzes.findUnique({
+      where: { id: quizId },
+      include: { quiz_questions: true }
+    });
+    
+    if (!quiz) return res.status(404).json({ error: 'Quiz not found' });
+
+    let calculatedScore = 0;
+    const processedAnswers = [];
+
+    // Helper to compare answers securely
+    const isAnswerCorrect = (type, correct, user) => {
+      if (type === 'single_mcq') return Number(user) === Number(correct);
+      if (type === 'multi_select' || type === 'multi_mcq') {
+        if (!Array.isArray(user) || !Array.isArray(correct)) return false;
+        if (user.length !== correct.length) return false;
+        const sortedUser = [...user].sort();
+        const sortedCorrect = [...correct].sort();
+        return sortedCorrect.every((v, i) => v === sortedUser[i]);
+      }
+      if (type === 'numeric') return Number(user) === Number(correct);
+      return false;
+    };
+
+    const answersList = Array.isArray(rawAnswers) ? rawAnswers : [];
+    
+    // Evaluate each submitted answer against the database truth
+    for (const ans of answersList) {
+      const q = quiz.quiz_questions.find((qq) => qq.id === ans.questionId);
+      if (q) {
+        const type = q.question_type || 'single_mcq';
+        let dbCorrect = q.correct_answer;
+        if ((type === 'multi_mcq' || type === 'multi_select') && !Array.isArray(dbCorrect)) {
+          dbCorrect = [dbCorrect]; // normalize fallback
+        }
+        
+        const isCorrect = isAnswerCorrect(type, dbCorrect, ans.selected);
+        if (isCorrect) calculatedScore++;
+        
+        processedAnswers.push({
+          questionId: ans.questionId,
+          selected: ans.selected,
+          correct: dbCorrect,
+          isCorrect: isCorrect
+        });
+      }
+    }
 
     if (session) activeSessions.delete(sessionId);
 
@@ -95,9 +144,9 @@ router.post('/:sessionId/submit', optionalAuth, async (req, res) => {
         data: {
           quiz_id: quizId,
           user_id: finalUserId,
-          score,
-          total_questions: totalQuestions,
-          answers: answers,
+          score: calculatedScore,
+          total_questions: quiz.quiz_questions.length,
+          answers: processedAnswers,
           completed_at: new Date()
         }
       });
