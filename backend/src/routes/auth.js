@@ -34,9 +34,14 @@ router.post('/register', async (req, res) => {
       select: { id: true, email: true, display_name: true, avatar_url: true },
     });
 
+    const roles = await prisma.user_roles.findMany({
+      where: { user_id: user.id },
+      select: { role: true },
+    });
+
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.cookie('token', token, COOKIE_OPTS);
-    res.json({ user });
+    res.json({ user: { ...user, roles: roles.map((r) => r.role) } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -57,12 +62,18 @@ router.post('/login', async (req, res) => {
 
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.cookie('token', token, COOKIE_OPTS);
+    const roles = await prisma.user_roles.findMany({
+      where: { user_id: user.id },
+      select: { role: true },
+    });
+
     res.json({
       user: {
         id: user.id,
         email: user.email,
         display_name: user.display_name,
         avatar_url: user.avatar_url,
+        roles: roles.map((r) => r.role),
       },
     });
   } catch (err) {
