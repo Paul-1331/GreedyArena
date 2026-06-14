@@ -60,6 +60,8 @@ const MyQuizzesList = ({ onEditQuiz, isAdmin }: MyQuizzesListProps) => {
       setDeleteTarget(null);
       setSelectedQuiz(null);
       queryClient.invalidateQueries({ queryKey: ["my-quizzes"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["quizzes"] });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to delete"),
   });
@@ -70,6 +72,7 @@ const MyQuizzesList = ({ onEditQuiz, isAdmin }: MyQuizzesListProps) => {
       toast.success("Quiz withdrawn to draft");
       setSelectedQuiz((prev) => prev ? { ...prev, status: "draft" } : null);
       queryClient.invalidateQueries({ queryKey: ["my-quizzes"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-review-queue"] });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to withdraw"),
   });
@@ -80,6 +83,7 @@ const MyQuizzesList = ({ onEditQuiz, isAdmin }: MyQuizzesListProps) => {
       toast.success("Quiz resubmitted for review");
       setSelectedQuiz((prev) => prev ? { ...prev, status: "submitted" } : null);
       queryClient.invalidateQueries({ queryKey: ["my-quizzes"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-review-queue"] });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to resubmit"),
   });

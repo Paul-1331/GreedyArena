@@ -202,6 +202,12 @@ const CreateQuizForm = ({ editQuiz, onEditComplete }: CreateQuizFormProps) => {
       );
       queryClient.invalidateQueries({ queryKey: ["my-quizzes"] });
       queryClient.invalidateQueries({ queryKey: ["admin-review-queue"] });
+      if (isEditing && editQuiz) {
+        queryClient.invalidateQueries({ queryKey: ["edit-quiz", editQuiz.id] });
+        queryClient.invalidateQueries({ queryKey: ["quiz-questions", editQuiz.id] });
+        queryClient.invalidateQueries({ queryKey: ["play-quiz"] });
+      }
+      queryClient.invalidateQueries({ queryKey: ["quizzes"] });
       if (isEditing && onEditComplete) {
         onEditComplete();
       } else {

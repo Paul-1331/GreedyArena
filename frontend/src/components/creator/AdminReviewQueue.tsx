@@ -58,6 +58,7 @@ const AdminReviewQueue = () => {
       setSelectedQuiz(null);
       queryClient.invalidateQueries({ queryKey: ["admin-review-queue"] });
       queryClient.invalidateQueries({ queryKey: ["my-quizzes"] });
+      queryClient.invalidateQueries({ queryKey: ["quizzes"] });
     },
     onError: (error) => toast.error(error instanceof ApiError ? error.message : "Failed to update"),
   });
@@ -70,6 +71,7 @@ const AdminReviewQueue = () => {
       setSelectedQuiz(null);
       queryClient.invalidateQueries({ queryKey: ["admin-review-queue"] });
       queryClient.invalidateQueries({ queryKey: ["my-quizzes"] });
+      queryClient.invalidateQueries({ queryKey: ["quizzes"] });
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to delete"),
   });
