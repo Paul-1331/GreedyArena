@@ -13,7 +13,7 @@ import { z } from "zod";
 
 const quizSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200, "Title too long"),
-  description: z.string().trim().min(1, "Description is required").max(1000, "Description too long"),
+  description: z.string().trim().max(1000, "Description too long").optional().or(z.literal("")),
   category: z.string().min(1, "Category is required"),
   difficulty: z.string().min(1, "Difficulty is required"),
 });
@@ -212,7 +212,7 @@ const CreateQuizForm = ({ editQuiz, onEditComplete }: CreateQuizFormProps) => {
         setQuestions([emptyQuestion()]);
       }
     },
-    onError: (error) => toast.error(error instanceof ApiError ? error.message : "Something went wrong"),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Something went wrong"),
   });
 
   const addQuestion = () => setQuestions((prev) => [...prev, emptyQuestion()]);
