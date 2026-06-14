@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { socket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trophy, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useQuery } from "@tanstack/react-query";
 
 interface LeaderboardEntry {
   user_id: string;
@@ -18,51 +17,16 @@ interface LiveMatchLeaderboardProps {
 }
 
 const LiveMatchLeaderboard = ({ matchId, isSpectator }: LiveMatchLeaderboardProps) => {
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: entries, isLoading } = useQuery({
+    queryKey: ["live-leaderboard", matchId],
+    queryFn: async () => {
+      const data = await api.get<LeaderboardEntry[]>(`/api/arena/matches/${matchId}/live-leaderboard`);
+      return data.sort((a, b) => b.score - a.score);
+    },
+    refetchInterval: 30000, // Poll every 30 seconds
+  });
 
-  // Initial fetch
-  useEffect(() => {
-    let mounted = true;
-    api.get<LeaderboardEntry[]>(`/api/arena/matches/${matchId}/live-leaderboard`)
-      .then((data) => {
-        if (mounted) {
-          setEntries(data.sort((a, b) => b.score - a.score));
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        console.error("Failed to load leaderboard", err);
-        if (mounted) setLoading(false);
-      });
-      
-    return () => { mounted = false; };
-  }, [matchId]);
-
-  // Socket listener for real-time score updates
-  useEffect(() => {
-    const handleScoreUpdate = (update: { user_id: string; score: number }) => {
-      setEntries((prev) => {
-        const existing = prev.find(e => e.user_id === update.user_id);
-        let newEntries;
-        if (existing) {
-          newEntries = prev.map(e => e.user_id === update.user_id ? { ...e, score: update.score } : e);
-        } else {
-          // Fallback if they weren't in the initial fetch for some reason
-          newEntries = [...prev, { user_id: update.user_id, display_name: "Player", avatar_url: null, score: update.score }];
-        }
-        // Re-sort the entries by score descending
-        return newEntries.sort((a, b) => b.score - a.score);
-      });
-    };
-
-    socket.on("score_updated", handleScoreUpdate);
-    return () => {
-      socket.off("score_updated", handleScoreUpdate);
-    };
-  }, []);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -84,7 +48,7 @@ const LiveMatchLeaderboard = ({ matchId, isSpectator }: LiveMatchLeaderboardProp
         )}
       </div>
 
-      {entries.length === 0 ? (
+      {!entries || entries.length === 0 ? (
         <p className="text-center text-muted-foreground py-8">No players found.</p>
       ) : (
         <ul className="space-y-3">

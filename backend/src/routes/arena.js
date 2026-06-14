@@ -237,6 +237,30 @@ router.post('/official-matches', requireAuth, requireAdmin, async (req, res) => 
   }
 });
 
+// DELETE /api/arena/matches/:id — cancel a war (admin)
+router.delete('/matches/:id', requireAuth, requireAdmin, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const match = await prisma.arena_matches.findUnique({ where: { id } });
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (match.status !== 'waiting') return res.status(400).json({ error: 'Can only cancel waiting wars' });
+
+    // Cancel scheduled jobs
+    const warEngine = req.app.get('warEngine');
+    if (warEngine) {
+      warEngine.cancelWar(id);
+    }
+
+    // Delete participants first, then match
+    await prisma.arena_participants.deleteMany({ where: { match_id: id } });
+    await prisma.arena_matches.delete({ where: { id } });
+
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/arena/official-matches — list active and upcoming official matches
 router.get('/official-matches', async (req, res) => {
   try {
@@ -658,8 +682,7 @@ router.post('/matches/:id/answer', requireAuth, async (req, res) => {
       },
     });
 
-    const io = req.app.get('io');
-    io.to(id).emit('score_updated', { user_id: req.user.id, score: newScore });
+    // Score updated, but using polling instead of socket.io
 
     res.json({
       isCorrect,

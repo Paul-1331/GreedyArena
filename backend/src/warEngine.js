@@ -157,7 +157,13 @@ export const setupWarEngine = (io) => {
     }
   };
 
+  const cancelWar = (matchId) => {
+    schedule.cancelJob(`start_${matchId}`);
+    schedule.cancelJob(`end_${matchId}`);
+    console.log(`[WarEngine] Cancelled scheduled jobs for war ${matchId}`);
+  };
+
   init();
 
-  return { scheduleWar };
+  return { scheduleWar, cancelWar };
 };

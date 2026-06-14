@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
 import { motion } from "framer-motion";
-import { Swords, Plus, LogIn, Loader2, Trophy, Crown, History } from "lucide-react";
+import { Loader2, Swords, Trophy, History, Plus, LogIn, Crown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ArenaLeaderboard from "@/components/arena/ArenaLeaderboard";
 import PastMatches from "@/components/arena/PastMatches";
@@ -68,6 +68,7 @@ interface OfficialMatch {
 const Arena = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [joinCode, setJoinCode] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState("");
@@ -107,11 +108,19 @@ const Arena = () => {
   const createMatch = useMutation({
     mutationFn: (quizId: string) => api.post<{ id: string; room_code: string }>("/api/arena/matches", { quiz_id: quizId }),
     onSuccess: (match) => {
-      toast.success(`Match created! Code: ${match.room_code}`);
       setCreateDialogOpen(false);
-      navigate(`/arena/${match.id}`);
+      navigate(`/arena/${match.id}/lobby`);
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to create match"),
+  });
+
+  const cancelWar = useMutation({
+    mutationFn: (matchId: string) => api.delete(`/api/arena/matches/${matchId}`),
+    onSuccess: () => {
+      toast.success("War cancelled successfully");
+      queryClient.invalidateQueries({ queryKey: ["arena-contests"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to cancel war"),
   });
 
   const joinMatch = useMutation({
@@ -232,6 +241,20 @@ const Arena = () => {
                           </p>
                         </div>
                         <div className="flex gap-2 w-full sm:w-auto">
+                          {user?.role === 'admin' && m.status === 'waiting' && (
+                            <Button 
+                              variant="destructive" 
+                              size="sm"
+                              className="font-body px-2"
+                              onClick={() => {
+                                if (confirm("Are you sure you want to cancel this war?")) {
+                                  cancelWar.mutate(m.id);
+                                }
+                              }}
+                            >
+                              {cancelWar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            </Button>
+                          )}
                           <Button 
                             variant="secondary" 
                             size="sm" 
