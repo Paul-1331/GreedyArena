@@ -76,7 +76,8 @@ export const setupWarEngine = (io) => {
       });
 
       // Filter out admin/creator
-      const validParticipants = participants.filter(p => p.user_id !== quiz?.creator_id);
+      //const validParticipants = participants.filter(p => p.user_id !== quiz?.creator_id);
+      const validParticipants = participants;
       if (validParticipants.length < 2) return;
 
       const playerIds = validParticipants.map(p => p.user_id);
@@ -102,7 +103,7 @@ export const setupWarEngine = (io) => {
         const uid = newRating.id;
         const participantInfo = validParticipants.find((p) => p.user_id === uid);
         const playerScore = participantInfo ? participantInfo.score : 0;
-        
+
         // Count as win if they are top score? For simplicity just use rating engine.
         // The computeMatchRatings likely just returns rating.
         const isWinner = playerScore === Math.max(...validParticipants.map(p => p.score));
