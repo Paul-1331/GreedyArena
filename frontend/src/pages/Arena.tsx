@@ -13,6 +13,17 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import ArenaLeaderboard from "@/components/arena/ArenaLeaderboard";
 import PastMatches from "@/components/arena/PastMatches";
+import AdminContestCreator from "@/components/arena/AdminContestCreator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -45,12 +56,22 @@ interface ArenaQuiz {
   status: string;
 }
 
+interface OfficialMatch {
+  id: string;
+  room_code: string;
+  status: string;
+  scheduled_start_at: string;
+  quiz: { title: string; category: string; difficulty: string; time_limit_seconds: number };
+  _count: { arena_participants: number };
+}
+
 const Arena = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [joinCode, setJoinCode] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState("");
+  const [warToJoin, setWarToJoin] = useState<OfficialMatch | null>(null);
 
   // Check for active match
   const { data: activeMatch } = useQuery({
@@ -74,6 +95,13 @@ const Arena = () => {
       return Array.from(map.values()).sort((a, b) => a.title.localeCompare(b.title));
     },
     enabled: !!user,
+  });
+
+  const { data: officialMatches } = useQuery({
+    queryKey: ["arena-contests"],
+    queryFn: () => api.get<OfficialMatch[]>("/api/arena/official-matches"),
+    enabled: !!user,
+    refetchInterval: 10000,
   });
 
   const createMatch = useMutation({
@@ -175,13 +203,56 @@ const Arena = () => {
             </TabsList>
 
             <TabsContent value="contests" className="space-y-4">
-              <div className="rounded-lg border border-dashed border-border bg-muted/50 p-8 text-center">
-                <Crown className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                <h2 className="font-display text-lg font-semibold text-foreground">Wars coming soon</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Official scheduled contests will appear here. Stay tuned!
-                </p>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg font-semibold text-foreground">Official Wars</h2>
+                <AdminContestCreator />
               </div>
+
+              {!officialMatches || officialMatches.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border bg-muted/50 p-8 text-center">
+                  <Crown className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    No upcoming wars. Stay tuned!
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {officialMatches.map((m) => {
+                    const startDate = new Date(m.scheduled_start_at);
+                    const isPlaying = m.status === 'playing';
+                    return (
+                      <div key={m.id} className="rounded-lg border border-border bg-card p-4 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                        <div>
+                          <p className="font-body font-semibold text-foreground">{m.quiz.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {startDate.toLocaleString()} · {m.quiz.category} · {m.quiz.time_limit_seconds / 60}m
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {m._count.arena_participants} registered
+                          </p>
+                        </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="flex-1 sm:flex-none font-body"
+                            onClick={() => navigate(`/arena/${m.id}`)}
+                          >
+                            Spectate
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="flex-1 sm:flex-none font-body"
+                            onClick={() => setWarToJoin(m)}
+                          >
+                            {isPlaying ? "Join Late" : "Register"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="play" className="space-y-6">
@@ -266,6 +337,29 @@ const Arena = () => {
           </Tabs>
         </motion.div>
       </div>
+
+      <AlertDialog open={!!warToJoin} onOpenChange={() => setWarToJoin(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Join Official War</AlertDialogTitle>
+            <AlertDialogDescription>
+              By joining <b>{warToJoin?.quiz.title}</b>, you are officially registering for this rated contest. 
+              If you close the tab, lose connection, or score 0, your Glicko-2 rating will be penalized.
+              Do you wish to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                if (warToJoin) joinMatch.mutate(warToJoin.room_code);
+              }}
+            >
+              Confirm Registration
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };

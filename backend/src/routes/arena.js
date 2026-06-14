@@ -225,9 +225,33 @@ router.post('/official-matches', requireAuth, requireAdmin, async (req, res) => 
         allow_unrated: allow_unrated ?? true,
         join_cutoff_ratio: 0.75,
       },
-      select: { id: true, room_code: true },
+      select: { id: true, room_code: true, scheduled_start_at: true, quiz_id: true },
     });
+    const warEngine = req.app.get('warEngine');
+    if (warEngine) {
+      warEngine.scheduleWar(match);
+    }
     res.json(match);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/arena/official-matches — list active and upcoming official matches
+router.get('/official-matches', async (req, res) => {
+  try {
+    const matches = await prisma.arena_matches.findMany({
+      where: {
+        is_official: true,
+        status: { in: ['waiting', 'playing'] },
+      },
+      include: {
+        quiz: { select: { title: true, category: true, difficulty: true, time_limit_seconds: true } },
+        _count: { select: { arena_participants: true } },
+      },
+      orderBy: { scheduled_start_at: 'asc' },
+    });
+    res.json(matches);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -245,10 +269,20 @@ router.post('/matches/join', requireAuth, async (req, res) => {
     });
 
     if (!match) return res.status(404).json({ error: 'Match not found' });
-    if (match.status !== 'waiting') return res.status(400).json({ error: 'Match has already started' });
+    
+    // For casual matches, must be waiting. For official wars, can join while playing!
+    if (!match.is_official && match.status !== 'waiting') {
+      return res.status(400).json({ error: 'Match has already started' });
+    }
+    if (match.is_official && !['waiting', 'playing'].includes(match.status)) {
+      return res.status(400).json({ error: 'War has already finished' });
+    }
+
     if (match._count.arena_participants >= match.max_players) {
       return res.status(400).json({ error: 'Match is full' });
     }
+
+    // TODO: Add rating checks here if min_rating / max_rating are set
 
     const existing = await prisma.arena_participants.findUnique({
       where: { match_id_user_id: { match_id: match.id, user_id: req.user.id } },
@@ -256,7 +290,14 @@ router.post('/matches/join', requireAuth, async (req, res) => {
 
     if (!existing) {
       await prisma.arena_participants.create({
-        data: { match_id: match.id, user_id: req.user.id },
+        data: { 
+          match_id: match.id, 
+          user_id: req.user.id,
+          // If joining an official war late, they are automatically answering
+          is_ready: match.is_official,
+          player_phase: (match.is_official && match.status === 'playing') ? 'answering' : 'waiting',
+          question_started_at: (match.is_official && match.status === 'playing') ? new Date() : null,
+        },
       });
     }
 
@@ -466,7 +507,12 @@ router.get('/matches/:id/play-state', requireAuth, async (req, res) => {
     const participant = await prisma.arena_participants.findUnique({
       where: { match_id_user_id: { match_id: id, user_id: req.user.id } },
     });
-    if (!participant) return res.status(403).json({ error: 'Not in this match' });
+    if (!participant) {
+      if (match.is_official) {
+        return res.json({ status: match.status, isSpectator: true, isOfficial: true });
+      }
+      return res.status(403).json({ error: 'Not in this match' });
+    }
 
     const questions = await prisma.quiz_questions.findMany({
       where: { quiz_id: match.quiz_id },

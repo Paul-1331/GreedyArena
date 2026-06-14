@@ -5,6 +5,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cookieParser from 'cookie-parser'
 import { setupArenaSocket } from './sockets/arenaSocket.js';
+import { setupWarEngine } from './warEngine.js';
 
 import authRoutes from './routes/auth.js';
 import quizRoutes from './routes/quizzes.js';
@@ -31,8 +32,10 @@ const io = new Server(httpServer, {
 });
 
 setupArenaSocket(io);
+const warEngine = setupWarEngine(io);
 
 app.set('io', io); // access io inside routes via req.app.get('io')
+app.set('warEngine', warEngine);
 
 const PORT = process.env.PORT || 4000;
 httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));

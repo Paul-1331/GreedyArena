@@ -28,6 +28,7 @@ interface Match {
   status: string;
   host_id: string;
   is_official: boolean;
+  scheduled_start_at: string | null;
   max_players: number;
   quizzes: {
     title: string;
@@ -132,11 +133,33 @@ const ArenaLobby = () => {
   const readyCount = participants?.filter((p) => p.is_ready).length ?? 0;
   const allReady = participants && participants.length >= 2 && readyCount === participants.length;
 
+  const [countdown, setCountdown] = useState<string>("");
+
+  useEffect(() => {
+    if (!match?.scheduled_start_at) return;
+    const updateCountdown = () => {
+      const now = new Date().getTime();
+      const start = new Date(match.scheduled_start_at!).getTime();
+      const diff = start - now;
+      if (diff <= 0) {
+        setCountdown("Starting soon...");
+      } else {
+        const h = Math.floor(diff / (1000 * 60 * 60));
+        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((diff % (1000 * 60)) / 1000);
+        setCountdown(`${h}h ${m}m ${s}s`);
+      }
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [match?.scheduled_start_at]);
+
   // Navigate via useEffect, never during render
   useEffect(() => {
     if (!match || !matchId) return;
     if (match.status === "playing" || match.status === "countdown") {
-      if (isOfficial && !isJoined) return;
+      if (isOfficial && !isJoined && window.location.pathname.endsWith("/lobby")) return; // Spectators can stay in lobby or go to play to see leaderboard
       navigate(`/arena/${matchId}/play`, { replace: true });
     } else if (match.status === "finished") {
       navigate(`/arena/${matchId}/results`, { replace: true });
@@ -204,6 +227,11 @@ const ArenaLobby = () => {
             <div className="mt-1 flex gap-2">
               <Badge variant="secondary">{match.quizzes?.category}</Badge>
               <Badge variant="outline">{match.quizzes?.difficulty}</Badge>
+              {isOfficial && match.scheduled_start_at && (
+                <Badge variant="default" className="ml-auto">
+                  Starts in: {countdown}
+                </Badge>
+              )}
             </div>
           </div>
 
