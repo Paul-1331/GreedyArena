@@ -241,7 +241,7 @@ const Arena = () => {
                           </p>
                         </div>
                         <div className="flex gap-2 w-full sm:w-auto">
-                          {user?.role === 'admin' && m.status === 'waiting' && (
+                          {user?.roles?.includes('admin') && m.status === 'waiting' && (
                             <Button 
                               variant="destructive" 
                               size="sm"
