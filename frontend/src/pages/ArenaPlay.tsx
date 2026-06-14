@@ -11,6 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Trophy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import LiveMatchLeaderboard from "@/components/arena/LiveMatchLeaderboard";
 
 interface PlayQuestion {
   id: string;
@@ -35,6 +36,7 @@ interface PlayState {
   myScore?: number;
   myAnswers?: any[];
   isOfficial?: boolean;
+  isSpectator?: boolean;
 }
 
 const optionLabels = ["A", "B", "C", "D"];
@@ -61,6 +63,8 @@ const ArenaPlay = () => {
     correctAnswer: number | number[];
     explanation: string | null;
   } | null>(null);
+
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const questionStartRef = useRef<number>(Date.now());
   const beganPlayingRef = useRef(false);
@@ -287,6 +291,16 @@ const ArenaPlay = () => {
     );
   }
 
+  if (playState.isSpectator) {
+    return (
+      <Layout>
+        <div className="container mx-auto max-w-2xl px-4 py-8">
+          <LiveMatchLeaderboard matchId={matchId!} isSpectator={true} />
+        </div>
+      </Layout>
+    );
+  }
+
   const q = playState.question;
   const phase = playState.phase;
   const totalQuestions = playState.totalQuestions ?? 0;
@@ -302,6 +316,15 @@ const ArenaPlay = () => {
             Question {currentIndex + 1} / {totalQuestions}
           </Badge>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowLeaderboard(!showLeaderboard)}
+              className="font-body mr-2 gap-2"
+            >
+              <Trophy className="h-4 w-4 text-primary" />
+              {showLeaderboard ? "Back to Quiz" : "Live Standings"}
+            </Button>
             <Badge variant="outline" className="font-body">
               Score: {playState.myScore ?? 0}
             </Badge>
@@ -315,13 +338,17 @@ const ArenaPlay = () => {
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${((currentIndex + (phase === "revealed" ? 1 : 0)) / totalQuestions) * 100}%` }}
-          />
-        </div>
+        {showLeaderboard ? (
+          <LiveMatchLeaderboard matchId={matchId!} isSpectator={false} />
+        ) : (
+          <>
+            {/* Progress bar */}
+            <div className="mb-6 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-primary transition-all duration-300"
+                style={{ width: `${((currentIndex + (phase === "revealed" ? 1 : 0)) / totalQuestions) * 100}%` }}
+              />
+            </div>
 
         <AnimatePresence mode="wait">
           <motion.div
@@ -473,6 +500,8 @@ const ArenaPlay = () => {
             </div>
           </motion.div>
         </AnimatePresence>
+        </>
+        )}
       </div>
     </Layout>
   );

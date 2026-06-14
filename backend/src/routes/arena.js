@@ -659,7 +659,7 @@ router.post('/matches/:id/answer', requireAuth, async (req, res) => {
     });
 
     const io = req.app.get('io');
-    io.to(id).emit('score_updated');
+    io.to(id).emit('score_updated', { user_id: req.user.id, score: newScore });
 
     res.json({
       isCorrect,
@@ -891,6 +891,30 @@ router.get('/history', requireAuth, async (req, res) => {
     );
 
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/arena/matches/:id/live-leaderboard
+router.get('/matches/:id/live-leaderboard', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const participants = await prisma.arena_participants.findMany({
+      where: { match_id: id },
+      include: {
+        user: { select: { display_name: true, avatar_url: true } }
+      }
+    });
+
+    const leaderboard = participants.map(p => ({
+      user_id: p.user_id,
+      display_name: p.user?.display_name || 'Player',
+      avatar_url: p.user?.avatar_url || null,
+      score: p.score
+    }));
+
+    res.json(leaderboard);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
