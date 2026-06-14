@@ -61,6 +61,7 @@ interface OfficialMatch {
   room_code: string;
   status: string;
   scheduled_start_at: string;
+  is_registered?: boolean;
   quiz: { title: string; category: string; difficulty: string; time_limit_seconds: number };
   _count: { arena_participants: number };
 }
@@ -72,7 +73,6 @@ const Arena = () => {
   const [joinCode, setJoinCode] = useState("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState("");
-  const [warToJoin, setWarToJoin] = useState<OfficialMatch | null>(null);
 
   // Check for active match
   const { data: activeMatch } = useQuery({
@@ -128,9 +128,27 @@ const Arena = () => {
     onSuccess: (match) => {
       toast.success("Joined match!");
       setJoinCode("");
-      navigate(`/arena/${match.id}`);
+      navigate(`/arena/${match.id}/lobby`);
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to join match"),
+  });
+
+  const registerWar = useMutation({
+    mutationFn: (matchId: string) => api.post(`/api/arena/matches/${matchId}/register`),
+    onSuccess: () => {
+      toast.success("Successfully registered for war!");
+      queryClient.invalidateQueries({ queryKey: ["arena-contests"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to register"),
+  });
+
+  const unregisterWar = useMutation({
+    mutationFn: (matchId: string) => api.post(`/api/arena/matches/${matchId}/leave`),
+    onSuccess: () => {
+      toast.success("Successfully unregistered");
+      queryClient.invalidateQueries({ queryKey: ["arena-contests"] });
+    },
+    onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to unregister"),
   });
 
   if (!user) {
@@ -255,21 +273,43 @@ const Arena = () => {
                               {cancelWar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                             </Button>
                           )}
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="flex-1 sm:flex-none font-body"
-                            onClick={() => navigate(`/arena/${m.id}`)}
-                          >
-                            Spectate
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="flex-1 sm:flex-none font-body"
-                            onClick={() => setWarToJoin(m)}
-                          >
-                            {isPlaying ? "Join Late" : "Register"}
-                          </Button>
+                          {!isPlaying && m.is_registered && (
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="flex-1 sm:flex-none font-body text-destructive hover:bg-destructive/10"
+                              onClick={() => {
+                                if (confirm("Are you sure you want to unregister?")) {
+                                  unregisterWar.mutate(m.id);
+                                }
+                              }}
+                            >
+                              Unregister
+                            </Button>
+                          )}
+                          {!isPlaying && !m.is_registered && (
+                            <Button 
+                              size="sm" 
+                              className="flex-1 sm:flex-none font-body"
+                              onClick={() => {
+                                if (confirm(`By joining ${m.quiz.title}, you are officially registering for this rated contest. If you score 0, your rating will be penalized. Proceed?`)) {
+                                  registerWar.mutate(m.id);
+                                }
+                              }}
+                            >
+                              Register
+                            </Button>
+                          )}
+                          {isPlaying && (
+                            <Button 
+                              variant={m.is_registered ? "default" : "secondary"} 
+                              size="sm" 
+                              className="flex-1 sm:flex-none font-body"
+                              onClick={() => navigate(`/arena/${m.id}/play`)}
+                            >
+                              {m.is_registered ? "Enter Quiz" : "Spectate"}
+                            </Button>
+                          )}
                         </div>
                       </div>
                     );
@@ -360,29 +400,6 @@ const Arena = () => {
           </Tabs>
         </motion.div>
       </div>
-
-      <AlertDialog open={!!warToJoin} onOpenChange={() => setWarToJoin(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Join Official War</AlertDialogTitle>
-            <AlertDialogDescription>
-              By joining <b>{warToJoin?.quiz.title}</b>, you are officially registering for this rated contest. 
-              If you close the tab, lose connection, or score 0, your Glicko-2 rating will be penalized.
-              Do you wish to proceed?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => {
-                if (warToJoin) joinMatch.mutate(warToJoin.room_code);
-              }}
-            >
-              Confirm Registration
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Layout>
   );
 };

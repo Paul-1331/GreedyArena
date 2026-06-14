@@ -262,7 +262,7 @@ router.delete('/matches/:id', requireAuth, requireAdmin, async (req, res) => {
 });
 
 // GET /api/arena/official-matches — list active and upcoming official matches
-router.get('/official-matches', async (req, res) => {
+router.get('/official-matches', requireAuth, async (req, res) => {
   try {
     const matches = await prisma.arena_matches.findMany({
       where: {
@@ -272,10 +272,50 @@ router.get('/official-matches', async (req, res) => {
       include: {
         quiz: { select: { title: true, category: true, difficulty: true, time_limit_seconds: true } },
         _count: { select: { arena_participants: true } },
+        arena_participants: {
+          where: { user_id: req.user.id },
+          select: { id: true }
+        }
       },
       orderBy: { scheduled_start_at: 'asc' },
     });
-    res.json(matches);
+    
+    const mapped = matches.map(m => ({
+      ...m,
+      is_registered: m.arena_participants.length > 0,
+      arena_participants: undefined
+    }));
+    
+    res.json(mapped);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/arena/matches/:id/register — register for a war
+router.post('/matches/:id/register', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const match = await prisma.arena_matches.findUnique({ where: { id } });
+    if (!match || !match.is_official) return res.status(404).json({ error: 'War not found' });
+    if (match.status !== 'waiting') return res.status(400).json({ error: 'War has already started' });
+
+    const existing = await prisma.arena_participants.findUnique({
+      where: { match_id_user_id: { match_id: id, user_id: req.user.id } },
+    });
+
+    if (!existing) {
+      await prisma.arena_participants.create({
+        data: {
+          match_id: id,
+          user_id: req.user.id,
+          is_ready: true,
+          player_phase: 'waiting',
+        },
+      });
+    }
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -547,8 +587,8 @@ router.get('/matches/:id/play-state', requireAuth, async (req, res) => {
       return res.json({ status: 'playing', noQuestions: true });
     }
 
-    const questionTimeSeconds = match.quiz.time_limit_seconds ?? 30;
-    const globalTimeTotal = totalQuestions * questionTimeSeconds;
+    const globalTimeTotal = match.quiz.time_limit_seconds ?? (totalQuestions * 30);
+    const questionTimeSeconds = globalTimeTotal / totalQuestions;
 
     const globalElapsedSec = (Date.now() - new Date(match.started_at).getTime()) / 1000;
     const globalRemaining = Math.max(0, globalTimeTotal - globalElapsedSec);
@@ -632,13 +672,13 @@ router.post('/matches/:id/answer', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Already answered this question' });
     }
 
-    const questionTimeSeconds = match.quiz.time_limit_seconds ?? 30;
     const questions = await prisma.quiz_questions.findMany({
       where: { quiz_id: match.quiz_id },
       orderBy: { order_index: 'asc' },
     });
     const totalQuestions = questions.length;
-    const globalTimeTotal = totalQuestions * questionTimeSeconds;
+    const globalTimeTotal = match.quiz.time_limit_seconds ?? (totalQuestions * 30);
+    const questionTimeSeconds = globalTimeTotal / totalQuestions;
     const globalElapsedSec = (Date.now() - new Date(match.started_at).getTime()) / 1000;
 
     if (globalElapsedSec >= globalTimeTotal) {

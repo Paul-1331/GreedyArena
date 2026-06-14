@@ -267,6 +267,22 @@ const ArenaPlay = () => {
   // Finished screen
   if (playState.status === "finished" || playState.finished) {
     const isWaitingForOthers = playState.status !== "finished";
+    
+    // If it's an official war and we're waiting for others, show live standings
+    if (isWaitingForOthers && playState.isOfficial) {
+      return (
+        <Layout>
+          <div className="container mx-auto max-w-2xl px-4 py-8">
+            <div className="mb-6 text-center">
+              <h2 className="font-display text-2xl font-bold text-foreground">You've finished!</h2>
+              <p className="text-muted-foreground">Waiting for other players to complete the war...</p>
+            </div>
+            <LiveMatchLeaderboard matchId={matchId!} isSpectator={false} />
+          </div>
+        </Layout>
+      );
+    }
+
     return (
       <Layout>
         <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
