@@ -105,7 +105,16 @@ export function useArenaGame(matchId: string | undefined) {
     };
 
     const onMatchUpdated = ({ status, startedAt }: { status: string; startedAt?: string }) => {
-      setGameState((prev) => prev ? { ...prev, status, startedAt: startedAt ?? prev.startedAt } : prev);
+      setGameState((prev) => {
+        // If transitioning to playing, we need the FULL state (questions, time limits, etc)
+        // so we re-fetch it from the server.
+        if (status === 'playing' && prev?.status !== 'playing') {
+          socket.emit('join_match', { matchId }, (res: any) => {
+            if (res?.error) toast.error(res.error);
+          });
+        }
+        return prev ? { ...prev, status, startedAt: startedAt ?? prev.startedAt } : prev;
+      });
     };
 
     socket.on('game_state', onGameState);

@@ -260,8 +260,8 @@ const Arena = () => {
                         </div>
                         <div className="flex gap-2 w-full sm:w-auto">
                           {user?.roles?.includes('admin') && m.status === 'waiting' && (
-                            <Button 
-                              variant="destructive" 
+                            <Button
+                              variant="destructive"
                               size="sm"
                               className="font-body px-2"
                               onClick={() => {
@@ -274,9 +274,9 @@ const Arena = () => {
                             </Button>
                           )}
                           {!isPlaying && m.is_registered && (
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               className="flex-1 sm:flex-none font-body text-destructive hover:bg-destructive/10"
                               onClick={() => {
                                 if (confirm("Are you sure you want to unregister?")) {
@@ -288,8 +288,8 @@ const Arena = () => {
                             </Button>
                           )}
                           {!isPlaying && !m.is_registered && (
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               className="flex-1 sm:flex-none font-body"
                               onClick={() => {
                                 if (confirm(`By joining ${m.quiz.title}, you are officially registering for this rated contest. If you score 0, your rating will be penalized. Proceed?`)) {
@@ -301,9 +301,9 @@ const Arena = () => {
                             </Button>
                           )}
                           {isPlaying && (
-                            <Button 
-                              variant={m.is_registered ? "default" : "secondary"} 
-                              size="sm" 
+                            <Button
+                              variant={m.is_registered ? "default" : "secondary"}
+                              size="sm"
                               className="flex-1 sm:flex-none font-body"
                               onClick={() => navigate(`/arena/${m.id}/play`)}
                             >
