@@ -109,7 +109,7 @@ const Arena = () => {
     mutationFn: (quizId: string) => api.post<{ id: string; room_code: string }>("/api/arena/matches", { quiz_id: quizId }),
     onSuccess: (match) => {
       setCreateDialogOpen(false);
-      navigate(`/arena/${match.id}/lobby`);
+      navigate(`/arena/${match.id}`);
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to create match"),
   });
@@ -128,7 +128,7 @@ const Arena = () => {
     onSuccess: (match) => {
       toast.success("Joined match!");
       setJoinCode("");
-      navigate(`/arena/${match.id}/lobby`);
+      navigate(`/arena/${match.id}`);
     },
     onError: (err) => toast.error(err instanceof ApiError ? err.message : "Failed to join match"),
   });
