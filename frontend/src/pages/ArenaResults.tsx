@@ -10,7 +10,38 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import QuestionReview from "@/components/QuestionReview";
 
-  const ArenaResults = () => {
+interface Standing {
+  id: string;
+  user_id: string;
+  score: number;
+  total_time_ms: number;
+  answers: unknown[];
+  rank: number;
+  display_name: string;
+  avatar_url: string | null;
+}
+
+interface RatingChange {
+  user_id: string;
+  rating: number;
+  deviation: number;
+  volatility: number;
+}
+
+interface MatchInfo {
+  id: string;
+  is_official: boolean;
+  quiz_id: string;
+  quizzes: { title: string; category: string };
+}
+
+interface ResultsResponse {
+  match: MatchInfo;
+  standings: Standing[];
+  ratingChanges: RatingChange[] | null;
+}
+
+const ArenaResults = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -19,10 +50,7 @@ import QuestionReview from "@/components/QuestionReview";
   // Fetch match details, standings, and rating changes
   const { data: results, isLoading } = useQuery({
     queryKey: ["arena-results", matchId],
-    queryFn: async () => {
-      const data = await api.get(`/api/arena/matches/${matchId}/results`);
-      return data;
-    },
+    queryFn: () => api.get<ResultsResponse>(`/api/arena/matches/${matchId}/results`),
     enabled: !!matchId,
   });
 

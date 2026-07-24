@@ -48,14 +48,14 @@ const ArenaLobby = () => {
     queryKey: ["arena-match", matchId],
     queryFn: () => api.get<Match>(`/api/arena/matches/${matchId}`),
     enabled: !!matchId,
-    refetchInterval: 3000,
+    // No polling — socket events (match_updated, participants_updated) drive invalidation
   });
 
   const { data: participants, isLoading: loadingParticipants } = useQuery({
     queryKey: ["arena-participants", matchId],
     queryFn: () => api.get<Participant[]>(`/api/arena/matches/${matchId}/participants`),
     enabled: !!matchId,
-    refetchInterval: 3000,
+    // No polling — socket events drive invalidation
   });
 
   // Socket: join room, listen for updates

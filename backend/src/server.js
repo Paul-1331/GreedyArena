@@ -3,13 +3,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import cookieParser from 'cookie-parser'
+import cookieParser from 'cookie-parser';
 import { setupArenaSocket } from './sockets/arenaSocket.js';
-import { setupWarEngine } from './warEngine.js';
+import { setupWarEngine } from './services/warEngine.js';
 
 import authRoutes from './routes/auth.js';
 import quizRoutes from './routes/quizzes.js';
-import arenaRoutes from './routes/arena.js';
+import arenaRoutes from './routes/arena/index.js';
 import profileRoutes from './routes/profiles.js';
 import playRoutes from './routes/play.js';
 
@@ -18,13 +18,15 @@ dotenv.config();
 const app = express();
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
-app.use(cookieParser())
+app.use(cookieParser());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/arena', arenaRoutes);
 app.use('/api/profiles', profileRoutes);
 app.use('/api/play', playRoutes);
+
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }));
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -34,7 +36,7 @@ const io = new Server(httpServer, {
 setupArenaSocket(io);
 const warEngine = setupWarEngine(io);
 
-app.set('io', io); // access io inside routes via req.app.get('io')
+app.set('io', io);
 app.set('warEngine', warEngine);
 
 const PORT = process.env.PORT || 4000;

@@ -1,8 +1,15 @@
-import { api } from "@/lib/api";
-import { motion, AnimatePresence } from "framer-motion";
-import { Trophy, Loader2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
+/**
+ * LiveMatchLeaderboard — real-time leaderboard driven by socket score_update events.
+ *
+ * Initial data is seeded from the REST endpoint on mount (one HTTP call).
+ * All subsequent updates come from the liveScores Map passed from useArenaGame —
+ * no polling, no refetchInterval.
+ */
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface LeaderboardEntry {
   user_id: string;
@@ -13,18 +20,29 @@ interface LeaderboardEntry {
 
 interface LiveMatchLeaderboardProps {
   matchId: string;
+  liveScores: Map<string, number>; // userId → latestScore from score_update events
   isSpectator?: boolean;
 }
 
-const LiveMatchLeaderboard = ({ matchId, isSpectator }: LiveMatchLeaderboardProps) => {
-  const { data: entries, isLoading } = useQuery({
-    queryKey: ["live-leaderboard", matchId],
-    queryFn: async () => {
-      const data = await api.get<LeaderboardEntry[]>(`/api/arena/matches/${matchId}/live-leaderboard`);
-      return data.sort((a, b) => b.score - a.score);
-    },
-    refetchInterval: 30000, // Poll every 30 seconds
-  });
+const LiveMatchLeaderboard = ({ matchId, liveScores, isSpectator }: LiveMatchLeaderboardProps) => {
+  const [baseEntries, setBaseEntries] = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Seed initial data from REST (one call on mount, never polled again)
+  useEffect(() => {
+    api.get<LeaderboardEntry[]>(`/api/arena/matches/${matchId}/live-leaderboard`)
+      .then((data) => setBaseEntries(data))
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, [matchId]);
+
+  // Merge socket score updates into the base entries and re-sort
+  const entries = baseEntries
+    .map((e) => ({
+      ...e,
+      score: liveScores.has(e.user_id) ? liveScores.get(e.user_id)! : e.score,
+    }))
+    .sort((a, b) => b.score - a.score);
 
   if (isLoading) {
     return (
@@ -48,7 +66,7 @@ const LiveMatchLeaderboard = ({ matchId, isSpectator }: LiveMatchLeaderboardProp
         )}
       </div>
 
-      {!entries || entries.length === 0 ? (
+      {entries.length === 0 ? (
         <p className="text-center text-muted-foreground py-8">No players found.</p>
       ) : (
         <ul className="space-y-3">
@@ -59,7 +77,7 @@ const LiveMatchLeaderboard = ({ matchId, isSpectator }: LiveMatchLeaderboardProp
                 layout
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                 className="flex items-center justify-between rounded-lg border border-border bg-background px-4 py-3 shadow-sm"
               >
                 <div className="flex items-center gap-4">
@@ -74,16 +92,12 @@ const LiveMatchLeaderboard = ({ matchId, isSpectator }: LiveMatchLeaderboardProp
                         {entry.display_name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="font-body font-medium text-foreground">
-                      {entry.display_name}
-                    </span>
+                    <span className="font-body font-medium text-foreground">{entry.display_name}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="font-mono text-sm px-3 py-1">
-                    {entry.score} pts
-                  </Badge>
-                </div>
+                <Badge variant="secondary" className="font-mono text-sm px-3 py-1">
+                  {entry.score} pts
+                </Badge>
               </motion.li>
             ))}
           </AnimatePresence>
