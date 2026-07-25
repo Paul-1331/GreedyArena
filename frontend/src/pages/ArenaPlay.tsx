@@ -142,6 +142,19 @@ const ArenaPlay = () => {
     );
   }
 
+  // Guard: status is 'playing' but the question data hasn't arrived yet
+  // (the ~100ms gap between the match_updated push and the game_state response).
+  // Show a spinner rather than broken "1/0 questions" UI.
+  if (gameState.status === 'playing' && !gameState.question && !gameState.finished) {
+    return (
+      <Layout>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+
   // ── Countdown screen ─────────────────────────────────────────────────────
   if (gameState.status === 'countdown' || gameState.status === 'waiting') {
     return (
