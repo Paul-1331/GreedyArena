@@ -201,9 +201,17 @@ const Arena = () => {
                     </p>
                   </div>
                 </div>
-                <Button onClick={() => navigate(`/arena/${activeMatch.id}`)} size="sm" className="gap-1.5 font-body">
+                <Button
+                  onClick={() => navigate(
+                    (activeMatch.status === 'playing' || activeMatch.status === 'countdown')
+                      ? `/arena/${activeMatch.id}/play`
+                      : `/arena/${activeMatch.id}`
+                  )}
+                  size="sm"
+                  className="gap-1.5 font-body"
+                >
                   <LogIn className="h-3.5 w-3.5" />
-                  Rejoin
+                  {activeMatch.status === 'playing' ? 'Rejoin Game' : activeMatch.status === 'countdown' ? 'Enter Now' : 'Rejoin'}
                 </Button>
               </div>
             </motion.div>

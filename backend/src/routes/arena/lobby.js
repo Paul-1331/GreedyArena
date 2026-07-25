@@ -15,8 +15,14 @@ const generateRoomCode = () => {
 // GET /api/arena/active — user's current active match
 router.get('/active', requireAuth, async (req, res) => {
   try {
+    // Filter by match status in the DB query — findFirst without this can return
+    // an old finished participation, causing the rejoin banner to never appear.
     const participation = await prisma.arena_participants.findFirst({
-      where: { user_id: req.user.id },
+      where: {
+        user_id: req.user.id,
+        match: { status: { in: ['waiting', 'countdown', 'playing'] } },
+      },
+      orderBy: { joined_at: 'desc' }, // most recently joined first
       include: {
         match: {
           select: {
@@ -28,7 +34,6 @@ router.get('/active', requireAuth, async (req, res) => {
     });
     if (!participation) return res.json(null);
     const match = participation.match;
-    if (!['waiting', 'countdown', 'playing'].includes(match.status)) return res.json(null);
     res.json({
       id: match.id, room_code: match.room_code, status: match.status,
       is_official: match.is_official, quizzes: { title: match.quiz.title },
@@ -43,6 +48,17 @@ router.post('/matches', requireAuth, async (req, res) => {
   const { quiz_id } = req.body;
   if (!quiz_id) return res.status(400).json({ error: 'quiz_id required' });
   try {
+    // Block if user is already in an active match
+    const alreadyActive = await prisma.arena_participants.findFirst({
+      where: {
+        user_id: req.user.id,
+        match: { status: { in: ['waiting', 'countdown', 'playing'] } },
+      },
+    });
+    if (alreadyActive) {
+      return res.status(409).json({ error: 'You are already in an active match. Leave or finish it first.' });
+    }
+
     const room_code = generateRoomCode();
     const match = await prisma.arena_matches.create({
       data: {
@@ -75,6 +91,17 @@ router.post('/matches/join', requireAuth, async (req, res) => {
       where: { match_id_user_id: { match_id: match.id, user_id: req.user.id } },
     });
     if (!existing) {
+      // Block if user is already in a different active match
+      const alreadyActive = await prisma.arena_participants.findFirst({
+        where: {
+          user_id: req.user.id,
+          match: { status: { in: ['waiting', 'countdown', 'playing'] } },
+        },
+      });
+      if (alreadyActive) {
+        return res.status(409).json({ error: 'You are already in an active match. Leave or finish it first.' });
+      }
+
       await prisma.arena_participants.create({
         data: {
           match_id: match.id, user_id: req.user.id,
