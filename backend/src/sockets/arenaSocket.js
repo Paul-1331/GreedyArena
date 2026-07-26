@@ -269,7 +269,10 @@ async function buildGameState(match, participant) {
   if (isFinished) {
     return {
       status: 'playing', finished: true, myScore: participant.score,
-      globalTimeLeft: 0, globalTimeTotal, totalQuestions, isOfficial: match.is_official,
+      // Include startedAt + real remaining time so the client's countdown
+      // keeps ticking correctly even after a page refresh.
+      startedAt: match.started_at,
+      globalTimeLeft, globalTimeTotal, totalQuestions, isOfficial: match.is_official,
     };
   }
 

@@ -49,7 +49,9 @@ const ArenaPlay = () => {
 
   useEffect(() => {
     if (!gameState?.startedAt || !gameState.globalTimeTotal) return;
-    if (gameState.status !== 'playing' || gameState.finished) return;
+    if (gameState.status !== 'playing') return;
+    // Keep ticking even when gameState.finished = true so the
+    // finish-wait screen shows a live countdown, not a frozen number.
 
     const tick = () => {
       const elapsed = (Date.now() - new Date(gameState.startedAt!).getTime()) / 1000;
@@ -60,7 +62,7 @@ const ArenaPlay = () => {
     tick(); // immediate
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [gameState?.startedAt, gameState?.globalTimeTotal, gameState?.status, gameState?.finished]);
+  }, [gameState?.startedAt, gameState?.globalTimeTotal, gameState?.status]);
 
   // Sync displayTimeLeft from server push (on reconnect or initial load)
   useEffect(() => {
@@ -176,10 +178,6 @@ const ArenaPlay = () => {
 
   // ── Finished — waiting for others or match auto-close ───────────────────
   if (gameState.finished && gameState.status !== 'finished') {
-    const timeRemaining = gameState.startedAt && gameState.globalTimeTotal
-      ? Math.max(0, Math.ceil(gameState.globalTimeTotal - (Date.now() - new Date(gameState.startedAt).getTime()) / 1000))
-      : null;
-
     return (
       <Layout>
         <div className="container mx-auto max-w-2xl px-4 py-8">
@@ -191,9 +189,10 @@ const ArenaPlay = () => {
                 ? "Waiting for all war participants to complete..."
                 : "Waiting for other players to finish..."}
             </p>
-            {timeRemaining !== null && timeRemaining > 0 && (
+            {/* displayTimeLeft ticks every second via the useEffect interval above */}
+            {displayTimeLeft !== null && displayTimeLeft > 0 && (
               <p className="mt-2 font-mono text-sm text-muted-foreground">
-                Match ends in <span className="font-bold text-foreground">{formatTime(timeRemaining)}</span>
+                Match ends in <span className="font-bold text-foreground">{formatTime(displayTimeLeft)}</span>
               </p>
             )}
           </div>
