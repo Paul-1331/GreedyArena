@@ -193,7 +193,7 @@ const Arena = () => {
           </div>
           <h1 className="mb-3 text-center font-display text-4xl font-bold text-foreground">Arena</h1>
           <p className="mx-auto mb-8 max-w-md text-center text-muted-foreground">
-            Compete in real-time quiz battles. Wars affect your ELO rating.
+            Compete in real-time quiz battles. Wars affect your rating.
           </p>
 
           {/* Active Match Banner */}
@@ -428,7 +428,7 @@ const Arena = () => {
               {confirmAction?.type === 'unregister' &&
                 "You will lose your spot in this war. You can re-register if registration is still open."}
               {confirmAction?.type === 'register' &&
-                "You are officially registering for this rated contest. Your ELO rating will be updated based on your performance. If you score 0 points, your rating will be penalized."}
+                "You are officially registering for this war. Your rating will be updated based on your performance."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
