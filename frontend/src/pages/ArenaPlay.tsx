@@ -174,28 +174,30 @@ const ArenaPlay = () => {
     );
   }
 
-  // ── Finished — waiting for others (official wars) ────────────────────────
+  // ── Finished — waiting for others or match auto-close ───────────────────
   if (gameState.finished && gameState.status !== 'finished') {
-    if (gameState.isOfficial) {
-      return (
-        <Layout>
-          <div className="container mx-auto max-w-2xl px-4 py-8">
-            <div className="mb-6 text-center">
-              <h2 className="font-display text-2xl font-bold text-foreground">You've finished!</h2>
-              <p className="text-muted-foreground">Waiting for other players to complete the war...</p>
-            </div>
-            <LiveMatchLeaderboard matchId={matchId!} liveScores={liveScores} />
-          </div>
-        </Layout>
-      );
-    }
+    const timeRemaining = gameState.startedAt && gameState.globalTimeTotal
+      ? Math.max(0, Math.ceil(gameState.globalTimeTotal - (Date.now() - new Date(gameState.startedAt).getTime()) / 1000))
+      : null;
+
     return (
       <Layout>
-        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-          <Trophy className="h-12 w-12 text-primary" />
-          <h2 className="font-display text-2xl font-bold text-foreground">Finished!</h2>
-          <p className="text-muted-foreground">Waiting for other players...</p>
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="container mx-auto max-w-2xl px-4 py-8">
+          <div className="mb-6 text-center">
+            <Trophy className="mx-auto mb-3 h-10 w-10 text-primary" />
+            <h2 className="font-display text-2xl font-bold text-foreground">You've finished!</h2>
+            <p className="text-muted-foreground">
+              {gameState.isOfficial
+                ? "Waiting for all war participants to complete..."
+                : "Waiting for other players to finish..."}
+            </p>
+            {timeRemaining !== null && timeRemaining > 0 && (
+              <p className="mt-2 font-mono text-sm text-muted-foreground">
+                Match ends in <span className="font-bold text-foreground">{formatTime(timeRemaining)}</span>
+              </p>
+            )}
+          </div>
+          <LiveMatchLeaderboard matchId={matchId!} liveScores={liveScores} />
         </div>
       </Layout>
     );

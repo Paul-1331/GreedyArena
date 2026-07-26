@@ -74,6 +74,22 @@ const Arena = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState("");
 
+  // Confirmation dialog state — replaces native window.confirm()
+  type ConfirmAction =
+    | { type: 'cancel_war'; matchId: string }
+    | { type: 'unregister'; matchId: string }
+    | { type: 'register'; matchId: string; quizTitle: string }
+    | null;
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+
+  const handleConfirm = () => {
+    if (!confirmAction) return;
+    if (confirmAction.type === 'cancel_war') cancelWar.mutate(confirmAction.matchId);
+    if (confirmAction.type === 'unregister') unregisterWar.mutate(confirmAction.matchId);
+    if (confirmAction.type === 'register') registerWar.mutate(confirmAction.matchId);
+    setConfirmAction(null);
+  };
+
   // Check for active match
   const { data: activeMatch } = useQuery({
     queryKey: ["arena-active-match"],
@@ -272,11 +288,7 @@ const Arena = () => {
                               variant="destructive"
                               size="sm"
                               className="font-body px-2"
-                              onClick={() => {
-                                if (confirm("Are you sure you want to cancel this war?")) {
-                                  cancelWar.mutate(m.id);
-                                }
-                              }}
+                              onClick={() => setConfirmAction({ type: 'cancel_war', matchId: m.id })}
                             >
                               {cancelWar.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                             </Button>
@@ -286,11 +298,7 @@ const Arena = () => {
                               variant="outline"
                               size="sm"
                               className="flex-1 sm:flex-none font-body text-destructive hover:bg-destructive/10"
-                              onClick={() => {
-                                if (confirm("Are you sure you want to unregister?")) {
-                                  unregisterWar.mutate(m.id);
-                                }
-                              }}
+                              onClick={() => setConfirmAction({ type: 'unregister', matchId: m.id })}
                             >
                               Unregister
                             </Button>
@@ -299,11 +307,7 @@ const Arena = () => {
                             <Button
                               size="sm"
                               className="flex-1 sm:flex-none font-body"
-                              onClick={() => {
-                                if (confirm(`By joining ${m.quiz.title}, you are officially registering for this rated contest. If you score 0, your rating will be penalized. Proceed?`)) {
-                                  registerWar.mutate(m.id);
-                                }
-                              }}
+                              onClick={() => setConfirmAction({ type: 'register', matchId: m.id, quizTitle: m.quiz.title })}
                             >
                               Register
                             </Button>
@@ -408,6 +412,38 @@ const Arena = () => {
           </Tabs>
         </motion.div>
       </div>
+
+      {/* Confirmation AlertDialog — replaces window.confirm() for all war actions */}
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">
+              {confirmAction?.type === 'cancel_war' && "Cancel this War?"}
+              {confirmAction?.type === 'unregister' && "Unregister from this War?"}
+              {confirmAction?.type === 'register' && `Register for ${(confirmAction as any)?.quizTitle ?? "this War"}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="font-body">
+              {confirmAction?.type === 'cancel_war' &&
+                "This will permanently delete the war and remove all registered participants. This cannot be undone."}
+              {confirmAction?.type === 'unregister' &&
+                "You will lose your spot in this war. You can re-register if registration is still open."}
+              {confirmAction?.type === 'register' &&
+                "You are officially registering for this rated contest. Your ELO rating will be updated based on your performance. If you score 0 points, your rating will be penalized."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="font-body">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={`font-body ${confirmAction?.type === 'cancel_war' || confirmAction?.type === 'unregister' ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}`}
+              onClick={handleConfirm}
+            >
+              {confirmAction?.type === 'cancel_war' && "Cancel War"}
+              {confirmAction?.type === 'unregister' && "Unregister"}
+              {confirmAction?.type === 'register' && "Register & Compete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 };

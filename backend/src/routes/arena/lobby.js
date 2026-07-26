@@ -13,16 +13,20 @@ const generateRoomCode = () => {
 };
 
 // GET /api/arena/active — user's current active match
+// An official war in 'waiting' status is NOT considered active:
+// the user has pre-registered for a future event and is free to play friendlies.
+// 'Active' means: any countdown/playing match, OR a non-official (friendly) lobby in waiting.
 router.get('/active', requireAuth, async (req, res) => {
   try {
-    // Filter by match status in the DB query — findFirst without this can return
-    // an old finished participation, causing the rejoin banner to never appear.
     const participation = await prisma.arena_participants.findFirst({
       where: {
         user_id: req.user.id,
-        match: { status: { in: ['waiting', 'countdown', 'playing'] } },
+        OR: [
+          { match: { status: { in: ['countdown', 'playing'] } } },
+          { match: { status: 'waiting', is_official: false } },
+        ],
       },
-      orderBy: { joined_at: 'desc' }, // most recently joined first
+      orderBy: { joined_at: 'desc' },
       include: {
         match: {
           select: {
@@ -43,16 +47,20 @@ router.get('/active', requireAuth, async (req, res) => {
   }
 });
 
+
 // POST /api/arena/matches — create friendly match
 router.post('/matches', requireAuth, async (req, res) => {
   const { quiz_id } = req.body;
   if (!quiz_id) return res.status(400).json({ error: 'quiz_id required' });
   try {
-    // Block if user is already in an active match
+    // Block if user is already in an active match (countdown/playing, or a non-official lobby)
     const alreadyActive = await prisma.arena_participants.findFirst({
       where: {
         user_id: req.user.id,
-        match: { status: { in: ['waiting', 'countdown', 'playing'] } },
+        OR: [
+          { match: { status: { in: ['countdown', 'playing'] } } },
+          { match: { status: 'waiting', is_official: false } },
+        ],
       },
     });
     if (alreadyActive) {
@@ -91,11 +99,21 @@ router.post('/matches/join', requireAuth, async (req, res) => {
       where: { match_id_user_id: { match_id: match.id, user_id: req.user.id } },
     });
     if (!existing) {
+      // Official wars are closed to new participants once created —
+      // players must register via the Register button before the war starts.
+      // The room code path is reserved for ALREADY-REGISTERED players to rejoin.
+      if (match.is_official) {
+        return res.status(403).json({ error: 'You are not registered for this war. Register from the Wars tab before it starts.' });
+      }
+
       // Block if user is already in a different active match
       const alreadyActive = await prisma.arena_participants.findFirst({
         where: {
           user_id: req.user.id,
-          match: { status: { in: ['waiting', 'countdown', 'playing'] } },
+          OR: [
+            { match: { status: { in: ['countdown', 'playing'] } } },
+            { match: { status: 'waiting', is_official: false } },
+          ],
         },
       });
       if (alreadyActive) {
@@ -231,7 +249,7 @@ router.post('/matches/:id/begin-playing', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/arena/matches/:id/join-official — late join for official wars
+// POST /api/arena/matches/:id/join-official — rejoin for registered war participants only
 router.post('/matches/:id/join-official', requireAuth, async (req, res) => {
   const { id } = req.params;
   try {
@@ -241,14 +259,9 @@ router.post('/matches/:id/join-official', requireAuth, async (req, res) => {
     const existing = await prisma.arena_participants.findUnique({
       where: { match_id_user_id: { match_id: id, user_id: req.user.id } },
     });
+    // Only pre-registered participants can use this route — same rule as room code join
     if (!existing) {
-      await prisma.arena_participants.create({
-        data: {
-          match_id: id, user_id: req.user.id, is_ready: true,
-          question_started_at: match.status === 'playing' ? new Date() : null,
-          player_phase: 'answering',
-        },
-      });
+      return res.status(403).json({ error: 'You are not registered for this war.' });
     }
     res.json({ success: true });
   } catch (err) {

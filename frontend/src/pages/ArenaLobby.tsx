@@ -159,12 +159,11 @@ const ArenaLobby = () => {
   useEffect(() => {
     if (!match || !matchId) return;
     if (match.status === "playing" || match.status === "countdown") {
-      if (isOfficial && !isJoined && window.location.pathname.endsWith("/lobby")) return; // Spectators can stay in lobby or go to play to see leaderboard
       navigate(`/arena/${matchId}/play`, { replace: true });
     } else if (match.status === "finished") {
       navigate(`/arena/${matchId}/results`, { replace: true });
     }
-  }, [match?.status, matchId, navigate, isOfficial, isJoined]);
+  }, [match?.status, matchId, navigate]);
 
   if (loadingMatch || loadingParticipants) {
     return (

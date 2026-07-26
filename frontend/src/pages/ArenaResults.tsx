@@ -98,7 +98,11 @@ const ArenaResults = () => {
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-6 text-center">
             <Trophy className="mx-auto mb-3 h-12 w-12 text-primary" />
             <h1 className="mb-1 font-display text-2xl font-bold text-foreground">
-              {winner?.user_id === user?.id ? "You Won!" : `${winner?.display_name} Wins!`}
+              {standings && standings.length > 0
+                ? winner?.user_id === user?.id
+                  ? "You Won!"
+                  : `${winner?.display_name ?? "Player"} Wins!`
+                : "Match Complete"}
             </h1>
             <p className="text-sm text-muted-foreground">
               {(match?.quizzes as any)?.title}

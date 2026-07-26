@@ -20,8 +20,14 @@ router.get('/matches/:id/results', requireAuth, async (req, res) => {
       include: { user: { select: { display_name: true, avatar_url: true } } },
     });
 
+    // Include everyone who played (even score=0), exclude ghost records with no answers
+    // that were created but the player disconnected before answering anything.
     const active = participants.filter((p) => (p.answers ?? []).length > 0);
-    const standings = active.map((p, idx) => ({
+
+    // If nobody answered at all (e.g. all players wandered off before the first question),
+    // fall back to all participants so the results page still renders meaningfully.
+    const ranked = (active.length > 0 ? active : participants);
+    const standings = ranked.map((p, idx) => ({
       id: p.id, user_id: p.user_id, score: p.score, total_time_ms: p.total_time_ms,
       answers: p.answers, rank: idx + 1,
       display_name: p.user.display_name ?? 'Player', avatar_url: p.user.avatar_url,
@@ -117,16 +123,19 @@ router.get('/history', requireAuth, async (req, res) => {
           orderBy: [{ score: 'desc' }, { total_time_ms: 'asc' }],
           select: { user_id: true },
         });
-        const rank = allParticipants.findIndex((ap) => ap.user_id === req.user.id) + 1;
+        const rankIdx = allParticipants.findIndex((ap) => ap.user_id === req.user.id);
+        // rankIdx === -1 means the user's record was deleted (e.g. host left mid-game)
+        // — skip this match from history to avoid showing Rank #0
+        if (rankIdx === -1) return null;
         return {
           match_id: p.match_id, quiz_title: p.match.quiz.title,
           category: p.match.quiz.category, is_official: p.match.is_official,
-          score: p.score, rank, total_participants: allParticipants.length,
+          score: p.score, rank: rankIdx + 1, total_participants: allParticipants.length,
           finished_at: p.match.finished_at,
         };
       })
     );
-    res.json(result);
+    res.json(result.filter(Boolean));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
